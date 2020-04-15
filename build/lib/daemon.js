@@ -13,6 +13,7 @@ const cp = require("child_process");
 const readline = require("readline");
 const crypto = require("crypto");
 const treekill = require("tree-kill");
+const { BufferListStream } = require('bl');
 function getIPCHandle(command) {
     const scope = crypto.createHash('md5')
         .update(command.path)
@@ -49,21 +50,27 @@ function createConnection(handle) {
 exports.createConnection = createConnection;
 function spawnCommand(server, command) {
     const clients = new Set();
-    const buffer = [];
+    const bl = new BufferListStream();
     const child = cp.spawn(command.path, command.args);
-    child.stdout.on('data', data => buffer.push(data));
-    server.on('connection', socket => {
-        for (const data of buffer) {
-            socket.write(data);
+    child.stdout.on('data', data => {
+        bl.append(data);
+        if (bl.length > 1000000) { // buffer caps at 1MB
+            bl.consume(bl.length - 1000000);
         }
-        child.stdout.pipe(socket);
-        clients.add(socket);
-        socket.on('data', () => {
-            treekill(child.pid);
-        });
-        socket.on('close', () => {
-            child.stdout.unpipe(socket);
-            clients.delete(socket);
+    });
+    server.on('connection', socket => {
+        const bufferStream = bl.duplicate();
+        bufferStream.pipe(socket, { end: false });
+        bufferStream.on('end', () => {
+            child.stdout.pipe(socket);
+            clients.add(socket);
+            socket.on('data', () => {
+                treekill(child.pid);
+            });
+            socket.on('close', () => {
+                child.stdout.unpipe(socket);
+                clients.delete(socket);
+            });
         });
     });
     child.on('exit', () => {
@@ -144,9 +151,9 @@ const command = {
 };
 const optionsArgv = process.argv.slice(2, commandPathIndex);
 const options = {
-    daemon: optionsArgv.some(arg => /^--daemon$/.test(arg)),
-    kill: optionsArgv.some(arg => /^--kill$/.test(arg)),
-    restart: optionsArgv.some(arg => /^--restart$/.test(arg))
+    daemon: optionsArgv.some(arg => arg === '--daemon'),
+    kill: optionsArgv.some(arg => arg === '--kill'),
+    restart: optionsArgv.some(arg => arg === '--restart')
 };
 main(command, options).catch(err => {
     console.error(err);

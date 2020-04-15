@@ -11,6 +11,7 @@ import * as cp from 'child_process';
 import * as readline from 'readline';
 import * as crypto from 'crypto';
 import * as treekill from 'tree-kill';
+const { BufferListStream } = require('bl');
 
 interface Command {
 	readonly path: string;
@@ -57,26 +58,33 @@ export function createConnection(handle: string): Promise<net.Socket> {
 
 export function spawnCommand(server: net.Server, command: Command): void {
 	const clients = new Set<net.Socket>();
-	const buffer: Buffer[] = [];
+	const bl = new BufferListStream();
 	const child = cp.spawn(command.path, command.args);
 
-	child.stdout.on('data', data => buffer.push(data));
+	child.stdout.on('data', data => {
+		bl.append(data);
+
+		if (bl.length > 1_000_000) { // buffer caps at 1MB
+			bl.consume(bl.length - 1_000_000);
+		}
+	});
 
 	server.on('connection', socket => {
-		for (const data of buffer) {
-			socket.write(data);
-		}
+		const bufferStream = bl.duplicate();
 
-		child.stdout.pipe(socket);
-		clients.add(socket);
+		bufferStream.pipe(socket, { end: false });
+		bufferStream.on('end', () => {
+			child.stdout.pipe(socket);
+			clients.add(socket);
 
-		socket.on('data', () => {
-			treekill(child.pid);
-		});
+			socket.on('data', () => {
+				treekill(child.pid);
+			});
 
-		socket.on('close', () => {
-			child.stdout.unpipe(socket);
-			clients.delete(socket);
+			socket.on('close', () => {
+				child.stdout.unpipe(socket);
+				clients.delete(socket);
+			});
 		});
 	});
 
@@ -177,9 +185,9 @@ const command: Command = {
 
 const optionsArgv = process.argv.slice(2, commandPathIndex);
 const options: Options = {
-	daemon: optionsArgv.some(arg => /^--daemon$/.test(arg)),
-	kill: optionsArgv.some(arg => /^--kill$/.test(arg)),
-	restart: optionsArgv.some(arg => /^--restart$/.test(arg))
+	daemon: optionsArgv.some(arg => arg === '--daemon'),
+	kill: optionsArgv.some(arg => arg === '--kill'),
+	restart: optionsArgv.some(arg => arg === '--restart')
 };
 
 main(command, options).catch(err => {
