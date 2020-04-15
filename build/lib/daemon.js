@@ -11,6 +11,7 @@ const os = require("os");
 const fs = require("fs");
 const cp = require("child_process");
 const crypto = require("crypto");
+const treekill = require("tree-kill");
 function getIPCHandle(command) {
     const scope = crypto.createHash('md5').update(command.path).update(command.args.toString()).digest('hex');
     if (process.platform === 'win32') {
@@ -53,7 +54,7 @@ function spawnCommand(server, command) {
         child.stdout.pipe(socket);
         clients.add(socket);
         socket.on('data', () => {
-            child.kill();
+            treekill(child.pid);
         });
         socket.on('close', () => {
             child.stdout.unpipe(socket);
@@ -67,11 +68,6 @@ function spawnCommand(server, command) {
         server.close();
         process.exit(0);
     });
-    process.on('SIGINT', () => {
-        child.kill();
-        process.exit(0);
-    });
-    process.on('exit', () => child.kill());
 }
 exports.spawnCommand = spawnCommand;
 async function connect(command, handle) {

@@ -9,6 +9,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as cp from 'child_process';
 import * as crypto from 'crypto';
+import * as treekill from 'tree-kill';
 
 interface Command {
 	readonly path: string;
@@ -64,7 +65,7 @@ export function spawnCommand(server: net.Server, command: Command): void {
 		clients.add(socket);
 
 		socket.on('data', () => {
-			child.kill();
+			treekill(child.pid);
 		});
 
 		socket.on('close', () => {
