@@ -143,11 +143,11 @@ async function main(command: Command, options: Options): Promise<void> {
 		process.stdin.setRawMode(true);
 	}
 
-	process.stdin.on('keypress', c => {
-		if (c === '\u0003') { // ctrl c
+	process.stdin.on('keypress', code => {
+		if (code === '\u0003') { // ctrl c
 			console.log('Disconnected from build daemon, it will stay running in the background.');
 			process.exit(0);
-		} else if (c === '\u000b') { // ctrl k
+		} else if (code === '\u0004') { // ctrl d
 			console.log('Killed build daemon.');
 			socket.write('kill');
 			process.exit(0);
