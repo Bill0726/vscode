@@ -14,10 +14,15 @@ import * as treekill from 'tree-kill';
 interface Command {
 	readonly path: string;
 	readonly args: string[];
+	readonly cwd: string;
 }
 
 function getIPCHandle(command: Command): string {
-	const scope = crypto.createHash('md5').update(command.path).update(command.args.toString()).digest('hex');
+	const scope = crypto.createHash('md5')
+		.update(command.path)
+		.update(command.args.toString())
+		.update(command.cwd)
+		.digest('hex');
 
 	if (process.platform === 'win32') {
 		return `\\\\.\\pipe\\daemon-${scope}`;
@@ -144,6 +149,7 @@ const [commandPath, ...commandArgs] = process.argv.slice(commandPathIndex);
 const command: Command = {
 	path: commandPath,
 	args: commandArgs,
+	cwd: process.cwd()
 };
 
 const optionsArgv = process.argv.slice(2, commandPathIndex);

@@ -13,7 +13,11 @@ const cp = require("child_process");
 const crypto = require("crypto");
 const treekill = require("tree-kill");
 function getIPCHandle(command) {
-    const scope = crypto.createHash('md5').update(command.path).update(command.args.toString()).digest('hex');
+    const scope = crypto.createHash('md5')
+        .update(command.path)
+        .update(command.args.toString())
+        .update(command.cwd)
+        .digest('hex');
     if (process.platform === 'win32') {
         return `\\\\.\\pipe\\daemon-${scope}`;
     }
@@ -116,6 +120,7 @@ const [commandPath, ...commandArgs] = process.argv.slice(commandPathIndex);
 const command = {
     path: commandPath,
     args: commandArgs,
+    cwd: process.cwd()
 };
 const optionsArgv = process.argv.slice(2, commandPathIndex);
 const options = {
