@@ -51,7 +51,10 @@ exports.createConnection = createConnection;
 function spawnCommand(server, command) {
     const clients = new Set();
     const bl = new BufferListStream();
-    const child = cp.spawn(command.path, command.args);
+    const child = cp.spawn(command.path, command.args, {
+        shell: process.platform === 'win32',
+        windowsHide: true
+    });
     child.stdout.on('data', data => {
         bl.append(data);
         if (bl.length > 1000000) { // buffer caps at 1MB
@@ -95,7 +98,7 @@ async function connect(command, handle) {
         }
         cp.spawn(process.execPath, [process.argv[1], '--daemon', command.path, ...command.args], {
             detached: true,
-            stdio: 'inherit'
+            stdio: 'ignore'
         });
         await new Promise(c => setTimeout(c, 200));
         return await createConnection(handle);

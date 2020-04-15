@@ -59,7 +59,10 @@ export function createConnection(handle: string): Promise<net.Socket> {
 export function spawnCommand(server: net.Server, command: Command): void {
 	const clients = new Set<net.Socket>();
 	const bl = new BufferListStream();
-	const child = cp.spawn(command.path, command.args);
+	const child = cp.spawn(command.path, command.args, {
+		shell: process.platform === 'win32',
+		windowsHide: true
+	});
 
 	child.stdout.on('data', data => {
 		bl.append(data);
@@ -110,7 +113,7 @@ async function connect(command: Command, handle: string): Promise<net.Socket> {
 
 		cp.spawn(process.execPath, [process.argv[1], '--daemon', command.path, ...command.args], {
 			detached: true,
-			stdio: 'inherit'
+			stdio: 'ignore'
 		});
 
 		await new Promise(c => setTimeout(c, 200));
