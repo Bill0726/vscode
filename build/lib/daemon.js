@@ -10,6 +10,7 @@ const net = require("net");
 const os = require("os");
 const fs = require("fs");
 const cp = require("child_process");
+const readline = require("readline");
 const crypto = require("crypto");
 const treekill = require("tree-kill");
 function getIPCHandle(command) {
@@ -109,7 +110,26 @@ async function main(command, options) {
         await new Promise(c => setTimeout(c, 500));
         socket = await connect(command, handle);
     }
+    readline.emitKeypressEvents(process.stdin);
+    if (process.stdin.isTTY && process.stdin.setRawMode) {
+        process.stdin.setRawMode(true);
+    }
+    process.stdin.on('keypress', c => {
+        if (c === '\u0003') { // ctrl c
+            console.log('Disconnected from build daemon, it will stay running in the background.');
+            process.exit(0);
+        }
+        else if (c === '\u000b') { // ctrl k
+            console.log('Killed build daemon.');
+            socket.write('kill');
+            process.exit(0);
+        }
+    });
     socket.pipe(process.stdout);
+    socket.on('close', () => {
+        console.log('Build daemon exited.');
+        process.exit(0);
+    });
 }
 if (process.argv.length < 3) {
     console.error('Usage: node daemon.js [OPTS] COMMAND [...ARGS]');

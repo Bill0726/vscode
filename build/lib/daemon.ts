@@ -8,6 +8,7 @@ import * as net from 'net';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as cp from 'child_process';
+import * as readline from 'readline';
 import * as crypto from 'crypto';
 import * as treekill from 'tree-kill';
 
@@ -136,7 +137,29 @@ async function main(command: Command, options: Options): Promise<void> {
 		socket = await connect(command, handle);
 	}
 
+	readline.emitKeypressEvents(process.stdin);
+
+	if (process.stdin.isTTY && process.stdin.setRawMode) {
+		process.stdin.setRawMode(true);
+	}
+
+	process.stdin.on('keypress', c => {
+		if (c === '\u0003') { // ctrl c
+			console.log('Disconnected from build daemon, it will stay running in the background.');
+			process.exit(0);
+		} else if (c === '\u000b') { // ctrl k
+			console.log('Killed build daemon.');
+			socket.write('kill');
+			process.exit(0);
+		}
+	});
+
 	socket.pipe(process.stdout);
+
+	socket.on('close', () => {
+		console.log('Build daemon exited.');
+		process.exit(0);
+	});
 }
 
 if (process.argv.length < 3) {
