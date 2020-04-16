@@ -16,6 +16,8 @@
     "compile": "gulp compile --max_old_space_size=4095",
     "watch": "gulp watch --max_old_space_size=4095",
     "watch-daemon": "node build/lib/daemon.js yarn watch",
+    "kill-watch-daemon": "node build/lib/daemon.js --kill yarn watch",
+    "restart-watch-daemon": "node build/lib/daemon.js --restart yarn watch",
     "watch-client": "gulp watch-client --max_old_space_size=4095",
     "mocha": "mocha test/unit/node/all.js --delay",
     "precommit": "node build/gulpfile.hygiene.js",
